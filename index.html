@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animasi Teleskop Refraktor</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --panel: #161b22;
+            --text: #ecf0f1;
+            --accent: #58a6ff;
+            --yellow: #f1c40f;
+            --red: #ff7b72;
+            --blue: #38bdf8;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .container { max-width: 900px; width: 100%; }
+        h1 { text-align: center; color: var(--accent); margin-top: 0; font-size: 24px; }
+        
+        .controls {
+            background: var(--panel); padding: 15px 20px; border-radius: 12px;
+            border: 1px solid #30363d; margin-bottom: 20px; display: flex;
+            justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;
+        }
+        .slider-group { display: flex; flex-direction: column; flex-grow: 1; min-width: 200px; }
+        label { font-weight: bold; font-size: 14px; margin-bottom: 5px; color: #8b949e; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        
+        .btn-toggle {
+            background: #21262d; border: 2px solid #30363d; color: var(--text);
+            padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: bold;
+            transition: 0.3s;
+        }
+        .btn-toggle.active { background: #791e22; border-color: var(--red); color: #fff; }
+
+        .canvas-box {
+            position: relative; width: 100%; height: 350px;
+            background: radial-gradient(circle at center, #1a253a 0%, #05080f 100%);
+            border: 1px solid #30363d; border-radius: 12px; overflow: hidden;
+            margin-bottom: 20px; box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+        }
+        canvas { width: 100%; height: 100%; display: block; }
+        
+        .desc-box {
+            background: var(--panel); padding: 20px; border-radius: 12px;
+            border-left: 5px solid var(--accent); border: 1px solid #30363d;
+            border-left-width: 5px;
+        }
+        .desc-box h2 { margin-top: 0; color: var(--yellow); font-size: 18px; }
+        .desc-box p { line-height: 1.6; color: #c9d1d9; font-size: 14px; margin-bottom: 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🔭 Animasi Cara Kerja Teleskop Refraktor (Lensa)</h1>
+
+    <!-- Panel Kontrol -->
+    <div class="controls">
+        <div class="slider-group">
+            <label>Jarak Fokus Lensa Depan (f<sub>o</sub>): <span id="val-focus" style="color:var(--accent);">500</span> px</label>
+            <input type="range" id="slider-focus" min="350" max="600" step="10" value="500">
+        </div>
+        <button class="btn-toggle" id="btn-chromatic" onclick="toggleChromatic()">
+            ⚠️ Aktifkan Aberasi Kromatik (Cacat Lensa)
+        </button>
+    </div>
+
+    <!-- Kanvas Animasi -->
+    <div class="canvas-box">
+        <canvas id="refractorCanvas" width="850" height="350"></canvas>
+    </div>
+
+    <!-- Penjelasan Dinamis -->
+    <div class="desc-box" id="desc-content">
+        <h2>💡 Prinsip Pembiasan Cahaya (Refraksi)</h2>
+        <p>Cahaya masuk dari kiri menemui <b>Lensa Objektif cembung</b> di depan. Lensa ini membelokkan cahaya menuju satu <b>Titik Fokus</b>. Perhatikan bagaimana cahaya dari atas menyilang ke bawah dan sebaliknya (membuat gambar di teleskop jadi terbalik!). Setelah titik fokus, cahaya ditangkap oleh <b>Lensa Okuler</b> agar sejajar kembali dan siap dilihat oleh mata kita di kanan.</p>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('refractorCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let focalX = 500;
+    let isChromatic = false;
+    let photons = [];
+
+    // Inisialisasi partikel cahaya
+    function initPhotons() {
+        photons = [];
+        const ys = [80, 115, 150, 175, 200, 235, 270]; // 7 berkas cahaya
+        ys.forEach((y, idx) => {
+            photons.push({
+                x: 10, y: y, startY: y, stage: 0, speed: 4,
+                isCenter: y === 175,
+                color: '#f1c40f' // Default kuning
+            });
+            // Jika aberasi kromatik aktif, buat klonan foton warna merah dan biru untuk tiap jalur
+            if (isChromatic && y !== 175) {
+                photons.push({ x: 10, y: y, startY: y, stage: 0, speed: 4, isCenter: false, color: '#ff7b72', type: 'red' });
+                photons.push({ x: 10, y: y, startY: y, stage: 0, speed: 4, isCenter: false, color: '#38bdf8', type: 'blue' });
+            }
+        });
+    }
+
+    function toggleChromatic() {
+        isChromatic = !isChromatic;
+        const btn = document.getElementById('btn-chromatic');
+        const desc = document.getElementById('desc-content');
+        if (isChromatic) {
+            btn.classList.add('active');
+            btn.innerHTML = "🔴 Sembunyikan Aberasi Kromatik";
+            desc.style.borderLeftColor = "var(--red)";
+            desc.innerHTML = `
+                <h2 style="color:var(--red);">⚠️ Aberasi Kromatik (Viaran Warna)</h2>
+                <p>Kaca lensa membiaskan warna dengan kekuatan yang berbeda! <b>Cahaya Biru</b> belok lebih tajam (fokus lebih dekat), sedangkan <b>Cahaya Merah</b> belok lebih landai (fokus lebih jauh). Akibatnya, titik fokus warna-warni ini tidak menyatu di satu titik! Inilah sebabnya mengapa teleskop refraktor murah sering menghasilkan warna ungu/merah berbayang di pinggiran Bulan atau planet.</p>
+            `;
+        } else {
+            btn.classList.remove('active');
+            btn.innerHTML = "⚠️ Aktifkan Aberasi Kromatik (Cacat Lensa)";
+            desc.style.borderLeftColor = "var(--accent)";
+            desc.innerHTML = `
+                <h2>💡 Prinsip Pembiasan Cahaya (Refraksi)</h2>
+                <p>Cahaya masuk dari kiri menemui <b>Lensa Objektif cembung</b> di depan. Lensa ini membelokkan cahaya menuju satu <b>Titik Fokus</b>. Perhatikan bagaimana cahaya dari atas menyilang ke bawah dan sebaliknya (membuat gambar di teleskop jadi terbalik!). Setelah titik fokus, cahaya ditangkap oleh <b>Lensa Okuler</b> agar sejajar kembali dan siap dilihat oleh mata kita di kanan.</p>
+            `;
+        }
+        initPhotons();
+    }
+
+    function drawOptics() {
+        // Garis sumbu tengah (Optical Axis)
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.moveTo(0, 175); ctx.lineTo(850, 175); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 1. Gambar Lensa Objektif (Depan - x=150)
+        ctx.fillStyle = "rgba(88, 166, 255, 0.3)";
+        ctx.strokeStyle = "#58a6ff"; ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(60, 175, 120, -0.8, 0.8, false); // Sisi kiri lensa
+        ctx.arc(240, 175, 120, Math.PI - 0.8, Math.PI + 0.8, false); // Sisi kanan lensa
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#fff"; ctx.font = "12px sans-serif";
+        ctx.fillText("Lensa Objektif", 110, 45);
+
+        // 2. Gambar Titik Fokus
+        ctx.fillStyle = isChromatic ? "#ff7b72" : "#2ecc71";
+        ctx.beginPath(); ctx.arc(focalX, 175, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#aaa"; ctx.font = "11px sans-serif";
+        ctx.fillText("Titik Fokus", focalX - 25, 200);
+
+        // 3. Gambar Lensa Okuler (Belakang - x=720)
+        ctx.fillStyle = "rgba(230, 126, 34, 0.3)";
+        ctx.strokeStyle = "#e67e22"; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(670, 175, 70, -0.6, 0.6, false);
+        ctx.arc(770, 175, 70, Math.PI - 0.6, Math.PI + 0.6, false);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#fff"; ctx.fillText("Lensa Okuler", 685, 115);
+
+        // 4. Mata Pengamat (x=800)
+        ctx.font = "24px sans-serif";
+        ctx.fillText("👁️", 800, 183);
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawOptics();
+
+        // Label cahaya masuk
+        ctx.fillStyle = "rgba(241, 196, 15, 0.1)";
+        ctx.fillRect(0, 70, 100, 210);
+        ctx.fillStyle = "#f1c40f"; ctx.font = "13px sans-serif";
+        ctx.fillText("➡️ Cahaya Masuk", 10, 30);
+
+        photons.forEach(p => {
+            // Gambar foton
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Tentukan target fokus berdasarkan tipe warna
+            let targetX = focalX;
+            if (p.type === 'blue') targetX = focalX - 40; // Biru belok lebih dekat
+            if (p.type === 'red') targetX = focalX + 40;  // Merah belok lebih jauh
+
+            // --- LOGIKA GERAK FOTON ---
+            // Stage 0: Lurus dari kiri ke Lensa Objektif (x=150)
+            if (p.stage === 0) {
+                p.x += p.speed * 2.5;
+                if (p.x >= 150) p.stage = 1;
+            }
+            // Stage 1: Dibengkokkan menuju Titik Fokus
+            else if (p.stage === 1) {
+                p.x += p.speed * 2.5;
+                if (!p.isCenter) {
+                    // Hitung rasio kemiringan menuju fokus
+                    let slope = (175 - p.startY) / (targetX - 150);
+                    p.y += slope * p.speed * 2.5;
+                }
+                if (p.x >= targetX) p.stage = 2;
+            }
+            // Stage 2: Menyilang dari titik fokus menuju Lensa Okuler (x=720)
+            else if (p.stage === 2) {
+                p.x += p.speed * 2.5;
+                if (!p.isCenter) {
+                    let slope = (175 - p.startY) / (targetX - 150);
+                    p.y += slope * p.speed * 2.5; // Terus meluncur dengan kemiringan yang sama
+                }
+                if (p.x >= 720) p.stage = 3;
+            }
+            // Stage 3: Keluar dari Lensa Okuler (Sejajar menuju mata)
+            else if (p.stage === 3) {
+                p.x += p.speed * 2.5;
+                // Jalur kembali lurus horisontal
+                if (p.x >= 820) resetPhoton(p);
+            }
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    function resetPhoton(p) {
+        p.x = 10;
+        p.y = p.startY;
+        p.stage = 0;
+    }
+
+    // Event listener untuk slider fokus
+    document.getElementById('slider-focus').addEventListener('input', function(e) {
+        focalX = parseInt(e.target.value);
+        document.getElementById('val-focus').textContent = focalX;
+    });
+
+    // Mulai animasi
+    initPhotons();
+    animate();
+</script>
+
+</body>
+</html>
